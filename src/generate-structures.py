@@ -1,17 +1,16 @@
 #!/usr/bin/env python
 
+
 import os
 import copy
-import random
 import itertools
 
 from pymatgen import Composition
 from pymatgen.io.gaussian import GaussianInput
 from pymatgen.core.structure import Molecule
 
+from tinydb import TinyDB
 
-gin = GaussianInput.from_file('input-template.com')
-gin.route_parameters['integral'] = '(acc2e=12)'  # hack to get round pmg bug
 
 # define the substituents
 subs = [('nitro', 'nitro'),
@@ -20,11 +19,8 @@ subs = [('nitro', 'nitro'),
         ('hydroxyl', 'hydroxyl'),
         ('fluoro', 'fluoro'),
         ('chloro', Molecule(['X', 'Cl'], [[0., 0., 0.], [0., 0., 1.11]])),
-        # ('bromo', Composition('Br')),
-        ('cf3', Molecule(['X', 'C', 'F', 'F', 'F'],
-                         [[-2.09, 0., -0.20], [-0.32, 0., -0.20],
-                          [0.26, 0.83, -1.64], [0.26, 0.83, 1.24],
-                          [0.26, -1.66, -0.20]]))]
+        ('bromo', Molecule(['X', 'Br'], [[0., 0., 0.], [0., 0., 1.11]])),
+        [None]]
 
 # define the x, y, z substituent positions as {name: site_ids}, where name is
 # consistent with Pakapol naming convention and site_id is a list of zero based
@@ -58,9 +54,11 @@ six_mem_b = [1, 2, 6, 7, 9, 9]
 five_mem_a = [0, 1, 9, 13, 12]
 five_mem_b = [2, 3, 10, 11, 6]
 
+data_to_write = []
 
-def save_input_file(ginp, nx=None, ny=None, nz=None, x_sub=None, y_sub=None,
-                    z_sub=None, prefix='ciba', folder='structure-files'):
+
+def cache_input_file(ginp, nx=None, ny=None, x_sub=None, y_sub=None,
+                     z_sub=None, prefix='ciba'):
     nx_str = nx if nx else ""
     ny_str = ny if ny else ""
     x_str = x_sub if x_sub else ""
@@ -68,52 +66,31 @@ def save_input_file(ginp, nx=None, ny=None, nz=None, x_sub=None, y_sub=None,
     z_str = z_sub if z_sub else ""
     ginp.title = '{}_nx-{}_ny-{}_x-{}_y-{}_z-{}'.format(prefix, nx_str, ny_str,
                                                         x_str, y_str, z_str)
-    ginp.write_file(os.path.join(folder, '{}.com'.format(ginp.title)),
-                    cart_coords=True)
+    data_to_write.append({'input': ginp.as_dict(), 'nx': nx, 'ny': ny,
+                          'x_sub': x_sub, 'y_sub': y_sub, 'z_sub': z_sub,
+                          'title': ginp.title})
 
-
-##############################################
-# generate unsubstituted pyridine structures #
-##############################################
-
-for nx, ny in itertools.product(nx_sites, ny_sites):
-    mol = copy.deepcopy(gin)
-
-    # don't bother with unsubtituted structure
-    if not nx[0] or not ny[0]:
-        continue
-
-    if nx[0]:
-        mol.molecule[nx[1][0]]._species = Composition('N')
-        mol.molecule[nx[1][1]]._species = Composition('N')
-    if ny[0]:
-        mol.molecule[ny[1][0]]._species = Composition('N')
-        mol.molecule[ny[1][1]]._species = Composition('N')
-
-    save_input_file(mol, nx=nx[0], ny=ny[0])
 
 ############################################
 # generate substituted pyridine structures #
 ############################################
 
-# randomly choose from nitrogen sites and substitutional sites
-# one thing to consider is that nx positions 2 and 3 are incompatible
+# need to consider that nx positions 2 and 3 are incompatible
 # with substitutional sites z and y, respectively and ny
 # position 3 is incompatible with substitional site x
 #
 # the other important note is that we need to substitute the atoms from the
 # highest site_id downwards, otherwise the order and index of the atoms will
 # change
-generated = 0
-while generated < 100:
-    mol = copy.deepcopy(gin)
 
-    # a some Nones to the lists to water the # substituents down a little
-    x_sub = random.choice(subs + [[None]]*4)
-    y_sub = random.choice(subs + [[None]]*4)
-    z_sub = random.choice(subs + [[None]]*4)
-    nx = random.choice(nx_sites + [[None]]*3)
-    ny = random.choice(ny_sites + [[None]]*3)
+gin = GaussianInput.from_file(os.path.join('..', 'templates',
+                                           'input-template.com'))
+gin.route_parameters['integral'] = '(acc2e=12)'  # hack to get round pmg bug
+
+print "generating pyridine substituted structures..."
+for nx, ny, x_sub, y_sub, z_sub in itertools.product(nx_sites, ny_sites,
+                                                     subs, subs, subs):
+    mol = copy.deepcopy(gin)
 
     # if there are any clashes or no substituents then skip the structure
     if ((x_sub[0] and ny[0] == 3) or (y_sub[0] and nx[0] == 2) or
@@ -142,16 +119,10 @@ while generated < 100:
 
     # now we can make substitutions in correct order
     for site, sub in sub_list:
-        # do this to get round really weird pmg bug, where a bromo group can't
-        # be subtituted into the structure more than twice, whereas a fluoro and
-        # chloro are fine (issue #687 in pymatgen github)
-        # actually, had to scrap the work around, it doesn't work.
-        # bromine is dead...
         mol.molecule.substitute(site, sub)
 
-    save_input_file(mol, nx=nx[0], ny=ny[0], x_sub=x_sub[0], y_sub=y_sub[0],
-                    z_sub=z_sub[0])
-    generated += 1
+    cache_input_file(mol, nx=nx[0], ny=ny[0], x_sub=x_sub[0], y_sub=y_sub[0],
+                     z_sub=z_sub[0])
 
 #############################################
 # generate substituted thiophene structures #
@@ -160,18 +131,13 @@ while generated < 100:
 # same as before, including substituent clashing and site_id ordering caveats
 # but don't have a ny nitrogen substituent this time
 
-gin = GaussianInput.from_file('input-template-thiol.com')
+gin = GaussianInput.from_file(os.path.join('..', 'templates',
+                                           'input-template-thiol.com'))
 gin.route_parameters['integral'] = '(acc2e=12)'  # hack to get round pmg bug
 
-generated = 0
-while generated < 20:
+print "generating thiophene substituted structures..."
+for nx, x_sub, y_sub, z_sub in itertools.product(nx_sites, subs, subs, subs):
     mol = copy.deepcopy(gin)
-
-    # a some Nones to the lists to water the # substituents down a little
-    x_sub = random.choice(subs + [[None]]*4)
-    y_sub = random.choice(subs + [[None]]*4)
-    z_sub = random.choice(subs + [[None]]*4)
-    nx = random.choice(nx_sites_thiol + [[None]]*3)
 
     # if there are any clashes or no substituents then skip the structure
     if ((y_sub[0] and nx[0] == 2) or (z_sub[0] and nx[0] == 3)):
@@ -196,6 +162,9 @@ while generated < 20:
     for site, sub in sub_list:
         mol.molecule.substitute(site, sub)
 
-    save_input_file(mol, nx=nx[0], x_sub=x_sub[0], y_sub=y_sub[0],
-                    z_sub=z_sub[0], prefix='ciba_thiol')
-    generated += 1
+    cache_input_file(mol, nx=nx[0], x_sub=x_sub[0], y_sub=y_sub[0],
+                     z_sub=z_sub[0], prefix='ciba_thiol')
+
+
+db = TinyDB(os.path.join('..', 'data', 'structures.json'))
+db.insert_multiple(data_to_write)

@@ -1,8 +1,8 @@
-%nprocshared=20
-%mem=60GB
+%nprocshared=24
+%mem=58GB
 %Nosave
 %chk=chkpt.chk
-#p opt b3lyp/6-311++G(d,p) geom=connectivity integral=(acc2e=12)
+#p opt b3lyp/6-311++G(d,p) integral=(acc2e=12)
 
 ciba
 
