@@ -1,0 +1,18 @@
+#!/bin/bash -l
+#$ -S /bin/bash
+#$ -l h_rt=12:00:00
+#$ -l mem=4G
+#$ -N job_name
+#$ -pe qlc 24
+#$ -cwd
+#$ -o q.output
+#$ -e q.error
+
+module load gaussian/g09-d01/pgi-2015.4
+source $g09root/g09/bsd/g09.profile
+mkdir -p $GAUSS_SCRDIR
+
+# Run g09 job
+echo "GAUSS_SCRDIR = $GAUSS_SCRDIR"
+
+../src/calculate-properties.py ${SGE_TASK_ID}

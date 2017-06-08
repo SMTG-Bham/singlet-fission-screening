@@ -6,9 +6,11 @@ import tarfile
 
 import numpy as np
 import scipy.linalg
+import logging
 
 from contextlib import contextmanager
 
+from pymatgen.core.periodic_table import DummySpecie
 from pymatgen.io.gaussian import GaussianInput, GaussianOutput
 
 from tinydb import TinyDB, Query
@@ -41,8 +43,8 @@ def add_dummy_atoms(mol, ring_atom_ids):
     unit = normal/scipy.linalg.norm(normal)
 
     # add the dummy atoms above and below the ring
-    mol.append('Bq', centre + unit)
-    mol.append('Bq', centre - unit)
+    mol.append(DummySpecie('X-Bq'), centre + unit)
+    mol.append(DummySpecie('X-Bq'), centre - unit)
     return mol
 
 
@@ -57,14 +59,14 @@ nmr_params = {'integral': '(acc2e=12)', 'guess': 'read', 'nmr': ''}
 
 # define the rings used to calculate NICS
 six_mem_a = [0, 1, 2, 3, 4, 5]
-six_mem_b = [1, 2, 6, 7, 9, 9]
+six_mem_b = [1, 2, 6, 7, 8, 9]
 five_mem_a = [0, 1, 9, 13, 12]
 five_mem_b = [2, 3, 10, 11, 6]
 
-index = int(sys.arv[1])
+index = int(sys.argv[1])
 
 # use absolute path so we don't loose track of the db when changing directory
-db = TinyDB(os.path.abspath(os.path.join('..', 'data', 'structures.json')))
+db = TinyDB(os.path.abspath('structures.json'))
 query = Query()
 compound = db.get(query.index == index)
 rin = GaussianInput.from_dict(compound['input'])
@@ -72,12 +74,15 @@ directory = rin.title
 
 
 def calculate_properties():
+    logging.info('started processing {}'.format(directory))
+
     with cd(directory):
         rin.write_file('relax.com', cart_coords=True)
         os.system('g09 < relax.com > relax.log')
         rout = GaussianOutput('relax.log')
         if not rout.properly_terminated:
-            # log to a file
+            logging.error('{} relaxation did not terminate correctly'.format(
+                          directory))
             return
 
         # do the TD-DFT calculation
@@ -89,7 +94,8 @@ def calculate_properties():
         os.system('g09 < td.com > td.log')
         tdout = GaussianOutput('td.log')
         if not tdout.properly_terminated:
-            # log to a file
+            logging.error('{} TD-DFT did not terminate correctly'.format(
+                          directory))
             return
 
         # do the TD-DFT calculation w. Tamm-Dancoff approx
@@ -102,7 +108,8 @@ def calculate_properties():
         os.system('g09 < tda.com > td.log')
         tdaout = GaussianOutput('tda.log')
         if not tdaout.properly_terminated:
-            # log to a file
+            logging.error('{} TDA-DFT did not terminate correctly'.format(
+                          directory))
             return
 
         # add the dummy atoms for the NICS(1)_zz calculations
@@ -119,11 +126,11 @@ def calculate_properties():
                                 link0_parameters=link0,
                                 route_parameters=nmr_params)
         nicssin.write_file('nics_singlet.com', cart_coords=True)
+        # work around as pymatgen does not allow Bq as an element
+        os.system("sed -i 's/X-Bq0+/Bq/g' nics_singlet.com")
         os.system('g09 < nics_singlet.com > nics_singlet.log')
         nicssout = GaussianOutput('nics_singlet.log')
-        if not nicssout.properly_terminated:
-            # log to a file
-            return
+        # can't have NICS job completion check due to above mentioned pmg bug
 
         nicstin = GaussianInput(mol_nics, charge=0, title=rin.title,
                                 spin_multiplicity=3, functional=functional,
@@ -131,15 +138,16 @@ def calculate_properties():
                                 link0_parameters=link0,
                                 route_parameters=nmr_params)
         nicstin.write_file('nics_triplet.com', cart_coords=True)
+        os.system("sed -i 's/X-Bq0+/Bq/g' nics_triplet.com")
         os.system('g09 < nics_triplet.com > nics_triplet.log')
         nicstout = GaussianOutput('nics_triplet.log')
-        if not nicstout.properly_terminated:
-            # log to a file
-            return
+    logging.info('finished processing {}'.format(directory))
 
-os.remove(os.path.join(directory, 'chkpt.chk'))
+with cd('calculations'):
+    logging.basicConfig(filename='calculations.log',level=logging.DEBUG)
 
-with tarfile.open("{}.tar.gz".format(directory), "w:gz") as tar:
-    for name in os.listdir(directory):
-        tar.add(name)
-#shutil.rmtree(directory)
+    calculate_properties()
+    os.remove(os.path.join(directory, 'chkpt.chk'))
+    with tarfile.open("{}.tar.gz".format(directory), "w:gz") as tar:
+        tar.add(directory)
+    shutil.rmtree(directory)
