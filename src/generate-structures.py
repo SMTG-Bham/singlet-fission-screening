@@ -55,9 +55,10 @@ five_mem_a = [0, 1, 9, 13, 12]
 five_mem_b = [2, 3, 10, 11, 6]
 
 data_to_write = []
+index = 1
 
 
-def cache_input_file(ginp, nx=None, ny=None, x_sub=None, y_sub=None,
+def cache_input_file(ginp, index, nx=None, ny=None, x_sub=None, y_sub=None,
                      z_sub=None, prefix='ciba'):
     nx_str = nx if nx else ""
     ny_str = ny if ny else ""
@@ -68,7 +69,7 @@ def cache_input_file(ginp, nx=None, ny=None, x_sub=None, y_sub=None,
                                                         x_str, y_str, z_str)
     data_to_write.append({'input': ginp.as_dict(), 'nx': nx, 'ny': ny,
                           'x_sub': x_sub, 'y_sub': y_sub, 'z_sub': z_sub,
-                          'title': ginp.title})
+                          'title': ginp.title, 'index': index})
 
 
 ############################################
@@ -121,8 +122,9 @@ for nx, ny, x_sub, y_sub, z_sub in itertools.product(nx_sites, ny_sites,
     for site, sub in sub_list:
         mol.molecule.substitute(site, sub)
 
-    cache_input_file(mol, nx=nx[0], ny=ny[0], x_sub=x_sub[0], y_sub=y_sub[0],
-                     z_sub=z_sub[0])
+    cache_input_file(mol, index, nx=nx[0], ny=ny[0], x_sub=x_sub[0],
+                     y_sub=y_sub[0], z_sub=z_sub[0])
+    index += 1
 
 #############################################
 # generate substituted thiophene structures #
@@ -162,8 +164,9 @@ for nx, x_sub, y_sub, z_sub in itertools.product(nx_sites, subs, subs, subs):
     for site, sub in sub_list:
         mol.molecule.substitute(site, sub)
 
-    cache_input_file(mol, nx=nx[0], x_sub=x_sub[0], y_sub=y_sub[0],
+    cache_input_file(mol, index, nx=nx[0], x_sub=x_sub[0], y_sub=y_sub[0],
                      z_sub=z_sub[0], prefix='ciba_thiol')
+    index += 1
 
 
 db = TinyDB(os.path.join('..', 'data', 'structures.json'))
