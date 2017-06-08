@@ -3,6 +3,7 @@
 import os
 import sys
 import tarfile
+import shutil
 
 import numpy as np
 import scipy.linalg
@@ -129,7 +130,6 @@ def calculate_properties():
         # work around as pymatgen does not allow Bq as an element
         os.system("sed -i 's/X-Bq0+/Bq/g' nics_singlet.com")
         os.system('g09 < nics_singlet.com > nics_singlet.log')
-        nicssout = GaussianOutput('nics_singlet.log')
         # can't have NICS job completion check due to above mentioned pmg bug
 
         nicstin = GaussianInput(mol_nics, charge=0, title=rin.title,
@@ -140,11 +140,10 @@ def calculate_properties():
         nicstin.write_file('nics_triplet.com', cart_coords=True)
         os.system("sed -i 's/X-Bq0+/Bq/g' nics_triplet.com")
         os.system('g09 < nics_triplet.com > nics_triplet.log')
-        nicstout = GaussianOutput('nics_triplet.log')
     logging.info('finished processing {}'.format(directory))
 
 with cd('calculations'):
-    logging.basicConfig(filename='calculations.log',level=logging.DEBUG)
+    logging.basicConfig(filename='calculations.log', level=logging.DEBUG)
 
     calculate_properties()
     os.remove(os.path.join(directory, 'chkpt.chk'))
