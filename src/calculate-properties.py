@@ -84,7 +84,7 @@ def calculate_properties():
         if not rout.properly_terminated:
             logging.error('{} relaxation did not terminate correctly'.format(
                           directory))
-            return
+            return 0
 
         # do the TD-DFT calculation
         tdin = GaussianInput(rout.final_structure, charge=0, title=rin.title,
@@ -97,7 +97,7 @@ def calculate_properties():
         if not tdout.properly_terminated:
             logging.error('{} TD-DFT did not terminate correctly'.format(
                           directory))
-            return
+            return 0
 
         # do the TD-DFT calculation w. Tamm-Dancoff approx
         tdain = GaussianInput(rout.final_structure, charge=0, title=rin.title,
@@ -106,12 +106,12 @@ def calculate_properties():
                               link0_parameters=link0,
                               route_parameters=tda_params)
         tdain.write_file('tda.com', cart_coords=True)
-        os.system('g09 < tda.com > td.log')
+        os.system('g09 < tda.com > tda.log')
         tdaout = GaussianOutput('tda.log')
         if not tdaout.properly_terminated:
             logging.error('{} TDA-DFT did not terminate correctly'.format(
                           directory))
-            return
+            return 0
 
         # add the dummy atoms for the NICS(1)_zz calculations
         mol_nics = rout.final_structure
@@ -141,12 +141,17 @@ def calculate_properties():
         os.system("sed -i 's/X-Bq0+/Bq/g' nics_triplet.com")
         os.system('g09 < nics_triplet.com > nics_triplet.log')
     logging.info('finished processing {}'.format(directory))
+    return 1
 
 with cd('calculations'):
     logging.basicConfig(filename='calculations.log', level=logging.DEBUG)
 
-    calculate_properties()
+    finished = calculate_properties()
+    if finished == 1:
+        filename = "{}.tar.gz".format(directory)
+    else:
+        filename = "{}_error.tar.gz".format(directory)
     os.remove(os.path.join(directory, 'chkpt.chk'))
-    with tarfile.open("{}.tar.gz".format(directory), "w:gz") as tar:
+    with tarfile.open(filename, "w:gz") as tar:
         tar.add(directory)
     shutil.rmtree(directory)
