@@ -28,24 +28,24 @@ subs = [('nitro', 'nitro'),
 sub_sites = {'x': [48, 49], 'y': [50, 51], 'z': [52, 53]}
 sub_sites_thiol = {'x': [47, 49], 'y': [30, 31], 'z': [32, 33]}
 
-# these lists give the nitrogen positions as (name, site_ids), where name is
-# consistent with Pakapol naming convention, and site_id is a list of zero based
-# array indexes
-nx_sites = [(1, [21, 28]),
-            (2, [22, 27]),
-            (3, [23, 26]),
-            (4, [24, 25]),
+# these lists give the nitrogen positions as (name, N site_ids, H site_ids),
+# where name is consistent with Pakapol naming convention, and site_id is a
+# list of zero based array indexes
+nx_sites = [(1, [21, 28], [43, 44]),
+            (2, [22, 27], [52, 53]),
+            (3, [23, 26], [50, 51]),
+            (4, [24, 25], [45, 42]),
             [None]]
-ny_sites = [(1, [19, 30]),
-            (2, [18, 32]),
-            (3, [17, 33]),
-            (4, [16, 34]),
-            (5, [15, 35]),
+ny_sites = [(1, [19, 30], [36, 40]),
+            (2, [18, 32], [41, 37]),
+            (3, [17, 33], [48, 49]),
+            (4, [16, 34], [46, 47]),
+            (5, [15, 35], [38, 39]),
             [None]]
-nx_sites_thiol = [(1, [16, 23]),
-                  (2, [17, 22]),
-                  (3, [18, 21]),
-                  (4, [19, 20]),
+nx_sites_thiol = [(1, [16, 23], [27, 28]),
+                  (2, [17, 22], [32, 33]),
+                  (3, [18, 21], [30, 31]),
+                  (4, [19, 20], [26, 29]),
                   [None]]
 
 # define the rings used to calculate NICS
@@ -87,7 +87,7 @@ def cache_input_file(ginp, index, nx=None, ny=None, x_sub=None, y_sub=None,
 gin = GaussianInput.from_file(os.path.join('..', 'templates',
                                            'input-template.com'))
 gin.route_parameters['integral'] = '(acc2e=12)'  # hack to get round pmg bug
-
+    yout
 print "generating pyridine substituted structures..."
 for nx, ny, x_sub, y_sub, z_sub in itertools.product(nx_sites, ny_sites,
                                                      subs, subs, subs):
@@ -100,16 +100,20 @@ for nx, ny, x_sub, y_sub, z_sub in itertools.product(nx_sites, ny_sites,
     elif not x_sub[0] and not y_sub[0] and not z_sub[0]:
         continue
 
+    # make a list of the substitutions and sort from highest to lowest site_id
+    # this list includes the H atoms next to the N we introduce in to the rings
+    sub_list = []
+
     # these substituions happen in place therefore don't care about order
     if nx[0]:
         mol.molecule[nx[1][0]]._species = Composition('N')
         mol.molecule[nx[1][1]]._species = Composition('N')
+        sub_list += zip(nx[2], [None]*2)
     if ny[0]:
         mol.molecule[ny[1][0]]._species = Composition('N')
         mol.molecule[ny[1][1]]._species = Composition('N')
+        sub_list += zip(ny[2], [None]*2)
 
-    # make a list of the substitutions and sort from highest to lowest site_id
-    sub_list = []
     if x_sub[0]:
         sub_list += zip(sub_sites['x'], [x_sub[1]]*2)
     if y_sub[0]:
@@ -120,7 +124,11 @@ for nx, ny, x_sub, y_sub, z_sub in itertools.product(nx_sites, ny_sites,
 
     # now we can make substitutions in correct order
     for site, sub in sub_list:
-        mol.molecule.substitute(site, sub)
+        if sub:
+            mol.molecule.substitute(site, sub)
+        else:
+            # hyrdogen atom to remove
+            gin.molecule.remove_sites([site])
 
     cache_input_file(mol, index, nx=nx[0], ny=ny[0], x_sub=x_sub[0],
                      y_sub=y_sub[0], z_sub=z_sub[0])
@@ -147,12 +155,14 @@ for nx, x_sub, y_sub, z_sub in itertools.product(nx_sites, subs, subs, subs):
     elif not x_sub[0] and not y_sub[0] and not z_sub[0]:
         continue
 
+    # make a list of the substitutions and sort from highest to lowest site_id
+    sub_list = []
+
     if nx[0]:
         mol.molecule[nx[1][0]]._species = Composition('N')
         mol.molecule[nx[1][1]]._species = Composition('N')
+        sub_list += zip(nx[2], [None]*2)
 
-    # make a list of the substitutions and sort from highest to lowest site_id
-    sub_list = []
     if x_sub[0]:
         sub_list += zip(sub_sites_thiol['x'], [x_sub[1]]*2)
     if y_sub[0]:
@@ -162,7 +172,11 @@ for nx, x_sub, y_sub, z_sub in itertools.product(nx_sites, subs, subs, subs):
     sub_list = sorted(sub_list, reverse=True, key=lambda x: x[0])
 
     for site, sub in sub_list:
-        mol.molecule.substitute(site, sub)
+        if sub:
+            mol.molecule.substitute(site, sub)
+        else:
+            # hyrdogen atom to remove
+            gin.molecule.remove_sites([site])
 
     cache_input_file(mol, index, nx=nx[0], x_sub=x_sub[0], y_sub=y_sub[0],
                      z_sub=z_sub[0], prefix='ciba_thiol')
