@@ -87,15 +87,15 @@ def cache_input_file(ginp, index, nx=None, ny=None, x_sub=None, y_sub=None,
 gin = GaussianInput.from_file(os.path.join('..', 'templates',
                                            'input-template.com'))
 gin.route_parameters['integral'] = '(acc2e=12)'  # hack to get round pmg bug
-    yout
+
 print "generating pyridine substituted structures..."
 for nx, ny, x_sub, y_sub, z_sub in itertools.product(nx_sites, ny_sites,
                                                      subs, subs, subs):
     mol = copy.deepcopy(gin)
 
     # if there are any clashes or no substituents then skip the structure
-    if ((x_sub[0] and ny[0] == 3) or (y_sub[0] and nx[0] == 2) or
-            (z_sub[0] and nx[0] == 3)):
+    if ((x_sub[0] and ny[0] == 3) or (y_sub[0] and nx[0] == 3) or
+            (z_sub[0] and nx[0] == 2)):
         continue
     elif not x_sub[0] and not y_sub[0] and not z_sub[0]:
         continue
@@ -128,7 +128,7 @@ for nx, ny, x_sub, y_sub, z_sub in itertools.product(nx_sites, ny_sites,
             mol.molecule.substitute(site, sub)
         else:
             # hyrdogen atom to remove
-            gin.molecule.remove_sites([site])
+            mol.molecule.remove_sites([site])
 
     cache_input_file(mol, index, nx=nx[0], ny=ny[0], x_sub=x_sub[0],
                      y_sub=y_sub[0], z_sub=z_sub[0])
@@ -150,7 +150,7 @@ for nx, x_sub, y_sub, z_sub in itertools.product(nx_sites, subs, subs, subs):
     mol = copy.deepcopy(gin)
 
     # if there are any clashes or no substituents then skip the structure
-    if ((y_sub[0] and nx[0] == 2) or (z_sub[0] and nx[0] == 3)):
+    if ((y_sub[0] and nx[0] == 3) or (z_sub[0] and nx[0] == 2)):
         continue
     elif not x_sub[0] and not y_sub[0] and not z_sub[0]:
         continue
@@ -176,12 +176,11 @@ for nx, x_sub, y_sub, z_sub in itertools.product(nx_sites, subs, subs, subs):
             mol.molecule.substitute(site, sub)
         else:
             # hyrdogen atom to remove
-            gin.molecule.remove_sites([site])
+            mol.molecule.remove_sites([site])
 
     cache_input_file(mol, index, nx=nx[0], x_sub=x_sub[0], y_sub=y_sub[0],
                      z_sub=z_sub[0], prefix='ciba_thiol')
     index += 1
-
 
 db = TinyDB(os.path.join('..', 'data', 'structures.json'))
 db.insert_multiple(data_to_write)
