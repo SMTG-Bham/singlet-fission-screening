@@ -87,7 +87,7 @@ def cache_input_file(ginp, index, nx=None, ny=None, x_sub=None, y_sub=None,
 gin = GaussianInput.from_file(os.path.join('..', 'templates',
                                            'input-template.com'))
 gin.route_parameters['integral'] = '(acc2e=12)'  # hack to get round pmg bug
-    yout
+
 print "generating pyridine substituted structures..."
 for nx, ny, x_sub, y_sub, z_sub in itertools.product(nx_sites, ny_sites,
                                                      subs, subs, subs):
