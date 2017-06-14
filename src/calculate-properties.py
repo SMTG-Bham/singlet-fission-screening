@@ -78,8 +78,18 @@ def calculate_properties():
     logging.info('started processing {}'.format(directory))
 
     with cd(directory):
-        rin.write_file('relax.com', cart_coords=True)
-        os.system('g09 < relax.com > relax.log')
+
+        # found that the relax often crashed or didn't finish, so will restart
+        # the calculation in these cases
+        try:
+            rout = GaussianOutput('relax.log')
+            if not rout.properly_terminated:
+                rout.to_input('relax.com', cart_coords=True)
+                os.system('g09 < relax.com > relax.log')
+        except IOError:
+            rin.write_file('relax.com', cart_coords=True)
+            os.system('g09 < relax.com > relax.log')
+
         rout = GaussianOutput('relax.log')
         if not rout.properly_terminated:
             logging.error('{} relaxation did not terminate correctly'.format(
@@ -91,13 +101,20 @@ def calculate_properties():
                              functional=functional, spin_multiplicity=1,
                              basis_set=basis_set, dieze_tag=dieze_tag,
                              link0_parameters=link0, route_parameters=td_params)
-        tdin.write_file('td.com', cart_coords=True)
-        os.system('g09 < td.com > td.log')
-        tdout = GaussianOutput('td.log')
-        if not tdout.properly_terminated:
-            logging.error('{} TD-DFT did not terminate correctly'.format(
-                          directory))
-            return 0
+        td_done = False
+        if os.path.isfile('td.log'):
+            tdout = GaussianOutput('td.log')
+            if tdout.properly_terminated:
+                td_done = True
+
+        if not td_done
+            tdin.write_file('td.com', cart_coords=True)
+            os.system('g09 < td.com > td.log')
+            tdout = GaussianOutput('td.log')
+            if not tdout.properly_terminated:
+                logging.error('{} TD-DFT did not terminate correctly'.format(
+                              directory))
+                return 0
 
         # do the TD-DFT calculation w. Tamm-Dancoff approx
         tdain = GaussianInput(rout.final_structure, charge=0, title=rin.title,
@@ -105,13 +122,20 @@ def calculate_properties():
                               basis_set=basis_set, dieze_tag=dieze_tag,
                               link0_parameters=link0,
                               route_parameters=tda_params)
-        tdain.write_file('tda.com', cart_coords=True)
-        os.system('g09 < tda.com > tda.log')
-        tdaout = GaussianOutput('tda.log')
-        if not tdaout.properly_terminated:
-            logging.error('{} TDA-DFT did not terminate correctly'.format(
-                          directory))
-            return 0
+        tda_done = False
+        if os.path.isfile('tda.log'):
+            tdaout = GaussianOutput('tda.log')
+            if tdaout.properly_terminated:
+                tda_done = True
+
+        if not tda_done:
+            tdain.write_file('tda.com', cart_coords=True)
+            os.system('g09 < tda.com > tda.log')
+            tdaout = GaussianOutput('tda.log')
+            if not tdaout.properly_terminated:
+                logging.error('{} TDA-DFT did not terminate correctly'.format(
+                              directory))
+                return 0
 
         # add the dummy atoms for the NICS(1)_zz calculations
         mol_nics = rout.final_structure
@@ -146,11 +170,25 @@ def calculate_properties():
 with cd('calculations'):
     logging.basicConfig(filename='calculations.log', level=logging.DEBUG)
 
+    restart_errored = False
+    tar_file = '{}.tar.gz'.format(directory)
+    error_tar_file = '{}_error.tar.gz'.format(directory)
+
+    if os.path.isfile(tar_file):
+        sys.exit()
+    elif os.path.isfile(error_tar_file):
+        restart_errored = True
+        with tarfile.open(error_tar_file) as tar:
+            tar.extractall()
+
     finished = calculate_properties()
     if finished == 1:
-        filename = "{}.tar.gz".format(directory)
+        filename = tar_file
+        if restart_errored:
+            os.remove(error_tar_file)
     else:
-        filename = "{}_error.tar.gz".format(directory)
+        filename = error_tar_file
+
     os.remove(os.path.join(directory, 'chkpt.chk'))
     with tarfile.open(filename, "w:gz") as tar:
         tar.add(directory)
