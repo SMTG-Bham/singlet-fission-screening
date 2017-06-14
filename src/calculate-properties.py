@@ -74,8 +74,7 @@ rin = GaussianInput.from_dict(compound['input'])
 directory = rin.title
 
 
-def calculate_properties():
-    logging.info('started processing {}'.format(directory))
+def calculate_properties(rin, directory):
 
     with cd(directory):
 
@@ -84,9 +83,21 @@ def calculate_properties():
         try:
             rout = GaussianOutput('relax.log')
             if not rout.properly_terminated:
-                rout.to_input('relax.com', cart_coords=True)
+                logging.info('restarting {}'.format(directory))
+                route = rout.route
+                route['integral'] = '(acc2e=12)'
+                rout.to_input('relax.com', cart_coords=True,
+                              route_parameters=route)
                 os.system('g09 < relax.com > relax.log')
         except IOError:
+            # relaxation hasn't been run yet
+            logging.info('started processing {}'.format(directory))
+            rin.write_file('relax.com', cart_coords=True)
+            os.system('g09 < relax.com > relax.log')
+        except IndexError, AttributeError:
+            # the relax calculation used the wrong header, fix this and restart
+            rin = GaussianInput.from_file('relax.com')
+            rin.route_parameters['integral'] = '(acc2e=12)'
             rin.write_file('relax.com', cart_coords=True)
             os.system('g09 < relax.com > relax.log')
 
@@ -181,7 +192,7 @@ with cd('calculations'):
         with tarfile.open(error_tar_file) as tar:
             tar.extractall()
 
-    finished = calculate_properties()
+    finished = calculate_properties(rin, directory)
     if finished == 1:
         filename = tar_file
         if restart_errored:
