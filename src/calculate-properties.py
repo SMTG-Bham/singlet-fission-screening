@@ -107,7 +107,7 @@ def calculate_properties():
             if tdout.properly_terminated:
                 td_done = True
 
-        if not td_done
+        if not td_done:
             tdin.write_file('td.com', cart_coords=True)
             os.system('g09 < td.com > td.log')
             tdout = GaussianOutput('td.log')
