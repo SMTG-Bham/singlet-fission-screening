@@ -93,11 +93,9 @@ for nx, ny, x_sub, y_sub, z_sub in itertools.product(nx_sites, ny_sites,
                                                      subs, subs, subs):
     mol = copy.deepcopy(gin)
 
-    # if there are any clashes or no substituents then skip the structure
+    # if there are any clashes then skip the structure
     if ((x_sub[0] and ny[0] == 3) or (y_sub[0] and nx[0] == 3) or
             (z_sub[0] and nx[0] == 2)):
-        continue
-    elif not x_sub[0] and not y_sub[0] and not z_sub[0]:
         continue
 
     # make a list of the substitutions and sort from highest to lowest site_id
@@ -146,13 +144,11 @@ gin = GaussianInput.from_file(os.path.join('..', 'templates',
 gin.route_parameters['integral'] = '(acc2e=12)'  # hack to get round pmg bug
 
 print "generating thiophene substituted structures..."
-for nx, x_sub, y_sub, z_sub in itertools.product(nx_sites, subs, subs, subs):
+for nx, x_sub, y_sub, z_sub in itertools.product(nx_sites_thiol, subs, subs, subs):
     mol = copy.deepcopy(gin)
 
-    # if there are any clashes or no substituents then skip the structure
+    # if there are any clashes then skip the structure
     if ((y_sub[0] and nx[0] == 3) or (z_sub[0] and nx[0] == 2)):
-        continue
-    elif not x_sub[0] and not y_sub[0] and not z_sub[0]:
         continue
 
     # make a list of the substitutions and sort from highest to lowest site_id
