@@ -100,5 +100,9 @@ ENV/
 # mypy
 .mypy_cache/
 
+# singlet fission files
 q.error
 q.output
+*_error.tar.gz
+*_incomplete.tar.gz
+calculations.log
