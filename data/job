@@ -7,8 +7,6 @@
 #$ -cwd
 #$ -o q.output
 #$ -e q.error
-#$ -P Gold
-#$ -A MCC_allocation
 
 module load gaussian/g09-d01/pgi-2015.4
 source $g09root/g09/bsd/g09.profile
