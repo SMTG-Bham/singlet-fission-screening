@@ -181,24 +181,20 @@ def calculate_properties(rin, directory):
 with cd('calculations'):
     logging.basicConfig(filename='calculations.log', level=logging.DEBUG)
 
-    restart_errored = False
     tar_file = '{}.tar.gz'.format(directory)
     error_tar_file = '{}_error.tar.gz'.format(directory)
 
     if os.path.isfile(tar_file):
         sys.exit()
+    elif os.path.isfile(error_tar_file) and os.path.isdir(directory):
+        os.remove(error_tar_file)
     elif os.path.isfile(error_tar_file):
-        restart_errored = True
         with tarfile.open(error_tar_file) as tar:
             tar.extractall()
+        os.remove(error_tar_file)
 
     finished = calculate_properties(rin, directory)
-    if finished == 1:
-        filename = tar_file
-        if restart_errored:
-            os.remove(error_tar_file)
-    else:
-        filename = error_tar_file
+    filename = tar_file if finished == 1 else error_tar_file
 
     os.remove(os.path.join(directory, 'chkpt.chk'))
     with tarfile.open(filename, "w:gz") as tar:
